@@ -29,9 +29,11 @@ function saveState(state) {
 
 function saveCommon(common) {
   localStorage.setItem(COMMON_KEY, JSON.stringify(common));
+  commonStore.set(common);
 }
 
 export const store = writable(loadState());
+export const commonStore = writable(loadCommon());
 
 store.subscribe(saveState);
 
@@ -188,6 +190,25 @@ export function getCommonTasks(n = 5) {
 
 export function getAllCommonTasks() {
   return loadCommon().sort((a, b) => b.frequency - a.frequency);
+}
+
+export function addCommonTask(name) {
+  const trimmed = name.trim();
+  if (!trimmed) return;
+  let common = loadCommon();
+  const existing = common.find(c => c.name.toLowerCase() === trimmed.toLowerCase());
+  if (existing) {
+    existing.frequency += 1;
+  } else {
+    common.push({ name: trimmed, frequency: 1 });
+  }
+  common.sort((a, b) => b.frequency - a.frequency);
+  saveCommon(common);
+}
+
+export function removeCommonTask(name) {
+  const common = loadCommon().filter(c => c.name.toLowerCase() !== name.toLowerCase());
+  saveCommon(common);
 }
 
 export function clearDatabase() {

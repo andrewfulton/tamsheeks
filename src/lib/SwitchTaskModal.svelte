@@ -1,5 +1,5 @@
 <script>
-  import { store, startTask, createAndStartTask, getRecentTasks, getCommonTasks, getAllCommonTasks } from './store.js';
+  import { store, commonStore, startTask, createAndStartTask, getRecentTasks } from './store.js';
   import { Dialog, DialogContent, DialogHeader, DialogTitle } from '$lib/components/ui/dialog/index.js';
   import { Button } from '$lib/components/ui/button/index.js';
   import { Input } from '$lib/components/ui/input/index.js';
@@ -10,7 +10,8 @@
   let showAllCommon = false;
 
   $: recentTasks = $store.tasks && getRecentTasks(5);
-  $: commonTasks = $store.tasks && (showAllCommon ? getAllCommonTasks() : getCommonTasks(5));
+  $: allCommon = [...$commonStore].sort((a, b) => b.frequency - a.frequency);
+  $: commonTasks = showAllCommon ? allCommon : allCommon.slice(0, 5);
 
   function handleSelect(taskId) {
     startTask(taskId);
@@ -89,13 +90,13 @@
             </Button>
           {/each}
         </div>
-        {#if getAllCommonTasks().length > 5}
+        {#if allCommon.length > 5}
           <Button
             variant="ghost"
             class="w-full text-xs text-muted-foreground"
             onclick={() => showAllCommon = !showAllCommon}
           >
-            {showAllCommon ? 'Show less' : `Load more (${getAllCommonTasks().length - 5} more)`}
+            {showAllCommon ? 'Show less' : `Load more (${allCommon.length - 5} more)`}
           </Button>
         {/if}
       </section>
