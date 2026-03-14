@@ -1,5 +1,5 @@
 <script>
-  import { store, getTodaysTasks, getAllTasks, clearDatabase, formatDuration } from './store.js';
+  import { store, getTodaysTasks, getTasksGroupedByDay, clearDatabase, formatDuration } from './store.js';
   import { Dialog, DialogContent, DialogHeader, DialogTitle } from '$lib/components/ui/dialog/index.js';
   import { Button } from '$lib/components/ui/button/index.js';
   import { Tabs, TabsList, TabsTrigger, TabsContent } from '$lib/components/ui/tabs/index.js';
@@ -17,6 +17,17 @@
     confirmingClear = false;
     open = false;
   }
+
+  function dayLabel(date) {
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    if (date.toDateString() === today.toDateString()) return 'Today';
+    if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+    return date.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'short' });
+  }
+
+  $: tasksByDay = $store.tasks && getTasksGroupedByDay().map(g => ({ ...g, label: dayLabel(g.date) }));
 </script>
 
 <Dialog bind:open>
@@ -47,17 +58,24 @@
       </TabsContent>
 
       <TabsContent value="all">
-        {#if getAllTasks().length === 0}
+        {#if tasksByDay.length === 0}
           <p class="text-sm text-muted-foreground text-center py-4">No tasks recorded yet.</p>
         {:else}
-          <ul class="space-y-1">
-            {#each getAllTasks() as task}
-              <li class="flex items-center justify-between px-2 py-1.5 rounded-md text-sm {$store.currentTaskId === task.id ? 'bg-accent font-medium' : ''}">
-                <span>{task.name}</span>
-                <span class="font-mono text-muted-foreground">{formatDuration(task.elapsedMs)}</span>
-              </li>
+          <div class="space-y-4">
+            {#each tasksByDay as group}
+              <section class="space-y-1">
+                <h3 class="text-xs font-medium text-muted-foreground uppercase tracking-wide px-2">{group.label}</h3>
+                <ul class="space-y-0.5">
+                  {#each group.tasks as task}
+                    <li class="flex items-center justify-between px-2 py-1.5 rounded-md text-sm {$store.currentTaskId === task.id ? 'bg-accent font-medium' : ''}">
+                      <span>{task.name}</span>
+                      <span class="font-mono text-muted-foreground">{formatDuration(task.elapsedMs)}</span>
+                    </li>
+                  {/each}
+                </ul>
+              </section>
             {/each}
-          </ul>
+          </div>
         {/if}
       </TabsContent>
     </Tabs>

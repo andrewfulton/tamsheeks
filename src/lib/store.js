@@ -47,18 +47,30 @@ function isToday(isoString) {
   return new Date(isoString) >= todayStart();
 }
 
+// Returns the effective end of a session, capped at 18:00 of the start day.
+// Sessions are assumed to finish on the same day they started (office hours rule).
+function sessionEffectiveEnd(session, taskId, state, now = new Date()) {
+  const start = new Date(session.start);
+  const rawEnd = session.end
+    ? new Date(session.end)
+    : (state.currentTaskId === taskId ? now : start);
+  const dayEnd = new Date(start);
+  dayEnd.setHours(18, 0, 0, 0);
+  return new Date(Math.min(rawEnd.getTime(), dayEnd.getTime()));
+}
+
 // Sum ms from completed sessions + optional live session
 export function getElapsedToday(taskId, state) {
   const s = state || get(store);
   const task = s.tasks.find(t => t.id === taskId);
   if (!task) return 0;
 
-  let ms = 0;
   const now = new Date();
+  let ms = 0;
   for (const session of task.sessions) {
     if (!isToday(session.start)) continue;
     const start = new Date(session.start);
-    const end = session.end ? new Date(session.end) : (s.currentTaskId === taskId ? now : start);
+    const end = sessionEffectiveEnd(session, taskId, s, now);
     ms += Math.max(0, end - start);
   }
   return ms;
@@ -156,12 +168,12 @@ export function getTodaysTasks() {
 
 export function getAllTasks() {
   const s = get(store);
+  const now = new Date();
   return s.tasks.map(t => {
     let ms = 0;
-    const now = new Date();
     for (const sess of t.sessions) {
       const start = new Date(sess.start);
-      const end = sess.end ? new Date(sess.end) : (s.currentTaskId === t.id ? now : start);
+      const end = sessionEffectiveEnd(sess, t.id, s, now);
       ms += Math.max(0, end - start);
     }
     return { ...t, elapsedMs: ms };
@@ -170,6 +182,36 @@ export function getAllTasks() {
     const bLast = Math.max(...b.sessions.map(s => new Date(s.start)));
     return bLast - aLast;
   });
+}
+
+export function getTasksGroupedByDay() {
+  const s = get(store);
+  const now = new Date();
+  const dayMap = new Map();
+
+  for (const task of s.tasks) {
+    for (const session of task.sessions) {
+      const start = new Date(session.start);
+      const end = sessionEffectiveEnd(session, task.id, s, now);
+      const dayKey = start.toDateString();
+
+      if (!dayMap.has(dayKey)) {
+        dayMap.set(dayKey, { date: start, tasks: new Map() });
+      }
+      const dayTasks = dayMap.get(dayKey).tasks;
+      if (!dayTasks.has(task.id)) {
+        dayTasks.set(task.id, { id: task.id, name: task.name, elapsedMs: 0 });
+      }
+      dayTasks.get(task.id).elapsedMs += Math.max(0, end - start);
+    }
+  }
+
+  return [...dayMap.values()]
+    .sort((a, b) => b.date - a.date)
+    .map(({ date, tasks }) => ({
+      date,
+      tasks: [...tasks.values()].sort((a, b) => b.elapsedMs - a.elapsedMs),
+    }));
 }
 
 export function getRecentTasks(n = 5) {
